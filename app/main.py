@@ -2,7 +2,9 @@ from typing import List, Optional
 from fastapi import FastAPI, HTTPException, Query
 from pydantic import BaseModel
 
+
 app = FastAPI(title="Clientes API", version="1.0.0")
+
 
 class Cliente(BaseModel):
     id: int
@@ -11,6 +13,7 @@ class Cliente(BaseModel):
     activo: bool
 
 # "Base de datos" en memoria (demo)
+
 CLIENTES = [
     {"id": 1, "nombre": "Ana Pérez", "email": "ana.perez@example.com", "activo": True},
     {"id": 2, "nombre": "Carlos Gómez", "email": "carlos.gomez@example.com", "activo": False},
