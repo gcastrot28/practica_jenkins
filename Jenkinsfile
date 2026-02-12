@@ -82,7 +82,10 @@ pipeline {
       steps {
         checkout scm
         script {
-          env.GIT_COMMIT_SHORT = sh(script: "git rev-parse --short HEAD", returnStdout: true).trim()
+          env.GIT_COMMIT_SHORT = sh(
+            script: "git rev-parse --short HEAD",
+            returnStdout: true
+          ).trim()
           env.IMAGE_TAG = "${env.DOCKER_IMAGE_REPO}:${env.GIT_COMMIT_SHORT}"
         }
       }
@@ -90,18 +93,38 @@ pipeline {
 
     stage('Docker Build (local)') {
       steps {
-        script { docker.build(env.IMAGE_TAG, ".") }
+        script {
+          docker.build(env.IMAGE_TAG, ".")
+        }
       }
     }
 
-    stage('Trivy - Imagen (SARIF + HTML) + Gate') {
+    stage('Trivy Scan (Imagen)') {
       steps {
         sh '''
           set -e
-          mkdir -p "${REPORTS_DIR}"
           mkdir -p .trivycache
+          mkdir -p "${REPORTS_DIR}"
 
-          echo "=== Reporte SARIF (imagen) ==="
+          echo "========================================================"
+          echo " Trivy scan de IMAGEN: ${IMAGE_TAG}"
+          echo " (Consulta el resultado completo en: Jenkins > Console Output)"
+          echo "========================================================"
+
+          echo "=== 1) ESCANEO (salida en consola) ==="
+          # Esto SIEMPRE corre y muestra resultados en el log.
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -v "$PWD/.trivycache:/root/.cache/" \
+            aquasec/trivy:latest image \
+            --severity HIGH,CRITICAL \
+            --format table \
+            "${IMAGE_TAG}" || true
+
+          echo "=== 2) Intento de generar reportes (si falla, NO falla el pipeline) ==="
+          set +e
+
+          # SARIF (para herramientas)
           docker run --rm \
             -v /var/run/docker.sock:/var/run/docker.sock \
             -v "$PWD/.trivycache:/root/.cache/" \
@@ -111,19 +134,32 @@ pipeline {
             --format sarif \
             -o /out/trivy-image.sarif \
             "${IMAGE_TAG}"
+          SARIF_RC=$?
 
-          echo "=== Reporte HTML (imagen) - sin template ==="
+          # TXT (table guardado)
           docker run --rm \
             -v /var/run/docker.sock:/var/run/docker.sock \
             -v "$PWD/.trivycache:/root/.cache/" \
             -v "$PWD/${REPORTS_DIR}:/out" \
             aquasec/trivy:latest image \
             --severity HIGH,CRITICAL \
-            --format html \
-            -o /out/trivy-image.html \
+            --format table \
+            -o /out/trivy-image.txt \
             "${IMAGE_TAG}"
+          TXT_RC=$?
 
-          echo "=== Quality Gate (falla si hay HIGH/CRITICAL) ==="
+          set -e
+
+          if [ $SARIF_RC -ne 0 ] && [ $TXT_RC -ne 0 ]; then
+            echo "⚠️  No se pudo generar SARIF/TXT. No pasa nada: revisa el resultado en Console Output."
+          else
+            echo "✅ Reportes generados (los verás en Jenkins > Artifacts):"
+            [ $SARIF_RC -eq 0 ] && echo " - ${REPORTS_DIR}/trivy-image.sarif"
+            [ $TXT_RC -eq 0 ] && echo " - ${REPORTS_DIR}/trivy-image.txt"
+          fi
+
+          echo "=== 3) Quality Gate (falla si hay HIGH/CRITICAL) ==="
+          # Si quieres que NO bloquee el pipeline, cambia --exit-code 1 por --exit-code 0
           docker run --rm \
             -v /var/run/docker.sock:/var/run/docker.sock \
             -v "$PWD/.trivycache:/root/.cache/" \
@@ -132,7 +168,7 @@ pipeline {
             --exit-code 1 \
             "${IMAGE_TAG}"
 
-          echo "✅ Gate OK"
+          echo "✅ Gate OK (sin HIGH/CRITICAL)"
         '''
       }
     }
@@ -150,7 +186,12 @@ pipeline {
 
   post {
     always {
+      // Archiva reportes si existen (si no existen, no falla)
       archiveArtifacts artifacts: "${REPORTS_DIR}/**", allowEmptyArchive: true
+
+      echo "Cómo consultar resultados:"
+      echo "1) Jenkins > tu build > Console Output (siempre disponible)"
+      echo "2) Jenkins > tu build > Artifacts (si se generaron reportes)"
     }
   }
 }
