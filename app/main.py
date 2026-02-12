@@ -4,13 +4,11 @@ from pydantic import BaseModel
 
 app = FastAPI(title="Clientes API", version="1.0.0")
 
-
 class Cliente(BaseModel):
     id: int
     nombre: str
     email: str
     activo: bool
-
 
 # "Base de datos" en memoria (demo)
 CLIENTES = [
