@@ -3,6 +3,8 @@ FROM python:3.12-slim
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
+ENV APP_PASSWORD="SuperSecret123!"
+
 WORKDIR /app
 
 COPY app/requirements.txt /app/requirements.txt
