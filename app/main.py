@@ -2,7 +2,9 @@ from typing import List, Optional
 from fastapi import FastAPI, HTTPException, Query
 from pydantic import BaseModel
 
+
 app = FastAPI(title="Clientes API", version="1.0.0")
+
 
 class Cliente(BaseModel):
     id: int
