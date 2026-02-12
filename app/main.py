@@ -17,11 +17,9 @@ CLIENTES = [
     {"id": 3, "nombre": "Luisa Martínez", "email": "luisa.martinez@example.com", "activo": True},
 ]
 
-
 @app.get("/health", tags=["health"])
 def health():
     return {"status": "ok"}
-
 
 @app.get("/clientes", response_model=List[Cliente], tags=["clientes"])
 def listar_clientes(
@@ -42,7 +40,6 @@ def listar_clientes(
         resultados = [c for c in resultados if c["activo"] == activo]
 
     return resultados[:limit]
-
 
 @app.get("/clientes/{cliente_id}", response_model=Cliente, tags=["clientes"])
 def obtener_cliente(cliente_id: int):
