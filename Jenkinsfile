@@ -36,8 +36,6 @@
 //     }
 //   }
 // }
-
-
 pipeline {
   agent any
   triggers {
@@ -55,7 +53,6 @@ pipeline {
         }
       }
     }
-
     stage('Docker Build & Push') {
       steps {
         script {
