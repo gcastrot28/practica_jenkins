@@ -101,14 +101,14 @@ pipeline {
       }
     }
 
-    stage('Trivy Scan (Repo + Imagen)') {
+    stage('Trivy Scan (Repo + Imagen) + Reportes') {
       steps {
         sh '''
           set -e
           mkdir -p "${REPORTS_DIR}"
           mkdir -p .trivycache
 
-          echo "=== 1) Scan del REPO (fs) -> reportes (NO falla aquí) ==="
+          echo "=== 1) Scan del REPO (fs) -> SARIF ==="
           docker run --rm \
             -v "$PWD:/work" -w /work \
             -v "$PWD/.trivycache:/root/.cache/" \
@@ -116,42 +116,77 @@ pipeline {
             aquasec/trivy:latest fs \
             --scanners vuln,misconfig,secret \
             --severity HIGH,CRITICAL \
-            --format sarif -o /out/trivy-fs.sarif \
+            --format sarif \
+            -o /out/trivy-fs.sarif \
             .
 
-          docker run --rm \
-            -v "$PWD:/work" -w /work \
-            -v "$PWD/.trivycache:/root/.cache/" \
-            -v "$PWD/${REPORTS_DIR}:/out" \
-            aquasec/trivy:latest fs \
-            --scanners vuln,misconfig,secret \
-            --severity HIGH,CRITICAL \
-            --format template --template "@contrib/html.tpl" \
-            -o /out/trivy-fs.html \
-            .
+          echo "=== 1b) Scan del REPO (fs) -> HTML (preferido: --format html) ==="
+          if docker run --rm \
+              -v "$PWD:/work" -w /work \
+              -v "$PWD/.trivycache:/root/.cache/" \
+              -v "$PWD/${REPORTS_DIR}:/out" \
+              aquasec/trivy:latest fs \
+              --scanners vuln,misconfig,secret \
+              --severity HIGH,CRITICAL \
+              --format html \
+              -o /out/trivy-fs.html \
+              . ; then
+            echo "✅ HTML fs generado con --format html"
+          else
+            echo "⚠️  --format html no soportado; usando template descargado..."
+            curl -sSL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/html.tpl -o html.tpl
+            docker run --rm \
+              -v "$PWD:/work" -w /work \
+              -v "$PWD/.trivycache:/root/.cache/" \
+              -v "$PWD/${REPORTS_DIR}:/out" \
+              aquasec/trivy:latest fs \
+              --scanners vuln,misconfig,secret \
+              --severity HIGH,CRITICAL \
+              --format template \
+              --template "@html.tpl" \
+              -o /out/trivy-fs.html \
+              .
+          fi
 
-          echo "=== 2) Scan de la IMAGEN -> reportes (NO falla aquí) ==="
+          echo "=== 2) Scan de la IMAGEN -> SARIF ==="
           docker run --rm \
             -v /var/run/docker.sock:/var/run/docker.sock \
             -v "$PWD/.trivycache:/root/.cache/" \
             -v "$PWD/${REPORTS_DIR}:/out" \
             aquasec/trivy:latest image \
             --severity HIGH,CRITICAL \
-            --format sarif -o /out/trivy-image.sarif \
+            --format sarif \
+            -o /out/trivy-image.sarif \
             "${IMAGE_TAG}"
 
-          docker run --rm \
-            -v /var/run/docker.sock:/var/run/docker.sock \
-            -v "$PWD/.trivycache:/root/.cache/" \
-            -v "$PWD/${REPORTS_DIR}:/out" \
-            aquasec/trivy:latest image \
-            --severity HIGH,CRITICAL \
-            --format template --template "@contrib/html.tpl" \
-            -o /out/trivy-image.html \
-            "${IMAGE_TAG}"
+          echo "=== 2b) Scan de la IMAGEN -> HTML (preferido: --format html) ==="
+          if docker run --rm \
+              -v /var/run/docker.sock:/var/run/docker.sock \
+              -v "$PWD/.trivycache:/root/.cache/" \
+              -v "$PWD/${REPORTS_DIR}:/out" \
+              aquasec/trivy:latest image \
+              --severity HIGH,CRITICAL \
+              --format html \
+              -o /out/trivy-image.html \
+              "${IMAGE_TAG}" ; then
+            echo "✅ HTML image generado con --format html"
+          else
+            echo "⚠️  --format html no soportado; usando template descargado..."
+            curl -sSL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/html.tpl -o html.tpl
+            docker run --rm \
+              -v /var/run/docker.sock:/var/run/docker.sock \
+              -v "$PWD/.trivycache:/root/.cache/" \
+              -v "$PWD/${REPORTS_DIR}:/out" \
+              -v "$PWD:/work" -w /work \
+              aquasec/trivy:latest image \
+              --severity HIGH,CRITICAL \
+              --format template \
+              --template "@html.tpl" \
+              -o /out/trivy-image.html \
+              "${IMAGE_TAG}"
+          fi
 
-          echo "=== 3) Quality Gate (falla si hay HIGH/CRITICAL) ==="
-          # Gate por imagen (SO base + libs)
+          echo "=== 3) Quality Gate (falla si hay HIGH/CRITICAL en la IMAGEN) ==="
           docker run --rm \
             -v /var/run/docker.sock:/var/run/docker.sock \
             -v "$PWD/.trivycache:/root/.cache/" \
