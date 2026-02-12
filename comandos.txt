@@ -1,0 +1,7 @@
+docker build -t my-app --no-cache .
+
+Listar imágenes: 
+docker images
+
+Compilar:
+docker run -d --name myapp -p 5005:5005 my-app
