@@ -18,22 +18,52 @@
 //         }
 //     }
 // }
+// pipeline {
+//   agent any
+//   triggers {
+//     pollSCM('* * * * *')
+//   }
+//   stages {
+//     stage('Checkout') {
+//       steps {
+//         checkout scm
+//       }
+//     }
+//     stage('Build') {
+//       steps {
+//         echo "Build..."
+//       }
+//     }
+//   }
+// }
+
+
 pipeline {
   agent any
-
   triggers {
-    pollSCM('* * * * *')
+    pollSCM('H/2 * * * *')
   }
-
   stages {
-    stage('Checkout') {
+    stage('Verificación SCM') {
       steps {
         checkout scm
+        script {
+          env.GIT_COMMIT_SHORT = sh(
+            script: "git rev-parse --short HEAD",
+            returnStdout: true
+          ).trim()
+        }
       }
     }
-    stage('Build') {
+
+    stage('Docker Build & Push') {
       steps {
-        echo "Build..."
+        script {
+          docker.withRegistry('https://registry.hub.docker.com', 'docker-hub') {
+            def nuestraapp = docker.build("lancelot2714/pythonapp:${env.GIT_COMMIT_SHORT}", ".")
+            nuestraapp.push()
+          }
+        }
       }
     }
   }
