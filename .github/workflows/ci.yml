@@ -9,9 +9,8 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Setup Python
@@ -19,11 +18,25 @@ jobs:
         with:
           python-version: '3.12'
 
+      - name: Debug workspace
+        run: |
+          pwd
+          ls -la
+          echo "---- requirements files ----"
+          find . -maxdepth 3 -type f -name "requirements*.txt" -print
+          echo "---- show requirements.txt ----"
+          sed -n '1,40p' requirements.txt
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          python -m pip install -r requirements.txt
 
-      - name: Run tests with coverage
+      - name: Verify pytest-cov is installed
         run: |
-          pytest --cov=app --cov-report=term --cov-fail-under=80
+          python -m pip show pytest pytest-cov
+          python -m pytest --version
+
+      - name: Run tests with coverage (min 80%)
+        run: |
+          python -m pytest -q --cov=app --cov-report=term-missing --cov-fail-under=80
