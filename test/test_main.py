@@ -73,9 +73,9 @@ def test_listar_clientes_filtro_activo_true():
 #     assert r.status_code == 422  # validación de FastAPI/Pydantic
 
 
-# def test_listar_clientes_limit_maximo_invalido():
-#     r = client.get("/clientes", params={"limit": 201})
-#     assert r.status_code == 422
+def test_listar_clientes_limit_maximo_invalido():
+    r = client.get("/clientes", params={"limit": 201})
+    assert r.status_code == 422
 
 
 # def test_obtener_cliente_existente():
@@ -86,7 +86,7 @@ def test_listar_clientes_filtro_activo_true():
 #     assert data["nombre"] == "Ana Pérez"
 
 
-# def test_obtener_cliente_no_existente():
-#     r = client.get("/clientes/999")
-#     assert r.status_code == 404
-#     assert r.json()["detail"] == "Cliente no encontrado"
+def test_obtener_cliente_no_existente():
+    r = client.get("/clientes/999")
+    assert r.status_code == 404
+    assert r.json()["detail"] == "Cliente no encontrado"
